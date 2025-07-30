@@ -1,9 +1,10 @@
 from datetime import datetime, date, timezone
 from typing import Any, Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from pydantic import BaseModel, Field, field_validator
 from uuid import uuid4
+from authentication import authenticate
 import uvicorn
 
 
@@ -45,7 +46,8 @@ todos[todo.id] = todo
 @app.get('/todos')
 def get_todos(
     sort_by: Literal['title', 'date', 'created_at'] = 'created_at',
-    descending: bool = False
+    descending: bool = False,
+    username: str = Depends(authenticate),
 ):
 
     sorted_todos = sorted(todos.items(), key=lambda item: getattr(item[1], sort_by), reverse=descending)
@@ -53,7 +55,7 @@ def get_todos(
 
 
 @app.get('/todos/{_id}')
-def get_todo(_id: str):
+def get_todo(_id: str, username: str = Depends(authenticate)):
     not_found_message = {'msg': 'Todo with that ID does not exist'}
 
     if _id in todos:
@@ -63,7 +65,7 @@ def get_todo(_id: str):
 
 
 @app.post('/todos')
-def create_todo(todo: Todo):
+def create_todo(todo: Todo, username: str = Depends(authenticate)):
     new_id = uuid4()
     todo.id = new_id
     todos[str(new_id)] = todo
@@ -77,6 +79,16 @@ def update_todo(_id: str, update_data: UpdateTodo):
     if _id in todos:
         todos[_id].completed = update_data.completed
         return todos[_id]
+
+    return not_found_message
+
+@app.delete('/todos/{_id}')
+def delete_todo(_id: str, username: str = Depends(authenticate)):
+    not_found_message = {'msg': 'Todo with that ID does not exist'}
+
+    if _id in todos:
+        deleted_todo = todos.pop(_id)
+        return deleted_todo
 
     return not_found_message
 
